@@ -89,6 +89,27 @@ $debugger->dump(new MyClass())
          ->dump('MK', 'My string');  // define custom caption
 ```
 
+### Test
+
+Do simple unit tests:
+
+```php
+class MyClass {
+    public $Var1 = 'TM';
+    private $Var2 = 'MK';
+}
+
+
+$debugger = phpDeeBuk::getInstance();
+
+$debugger->assertTrue(1 == '1')  // ok
+         ->assertFalse('2' == 2)  // fails
+         ->assertEqual('3', 3)  // ok
+         ->assertExact('3', 3)  // fails
+         ->assertNotEqual('4', 4)  // fails
+         ->assertNotExact('4', 4, 'My 2nd 4 value check')  // ok (with custom caption)
+```
+
 ### Variables
 
 Work with variables:
@@ -100,6 +121,7 @@ $debugger->setVar('TM', 5979);
 $var1 = $debugger->getVar('tm');   // var names are NOT case sensitive
                                    // other way: $var1 = $debugger['tm']
 
+// other way: isset($debugger['MK'])
 if (!$debugger->issetVar('MK')) {
     $debugger['mk'] = 23979;
 }
