@@ -28,15 +28,15 @@ final class phpDeeBuk {
     /**
      * @var int
      */
-    private $_analyzeDumpCounter;
-    /**
-     * @var int
-     */
     private $_analyzeObjCounter;
     /**
      * @var int
      */
     private $_analyzeValCounter;
+    /**
+     * @var int
+     */
+    private $_backtraceCounter;
     /**
      * @var string
      */
@@ -45,6 +45,10 @@ final class phpDeeBuk {
      * @var string
      */
     private $_console;
+    /**
+     * @var int
+     */
+    private $_dumpCounter;
     /**
      * @var string
      */
@@ -150,6 +154,40 @@ final class phpDeeBuk {
     }
 
     /**
+     * Does a debug_backtrace.
+     *
+     * @param string $caption The custom caption to use.
+     * @param int $limit The maximum number of entries.
+     * @param int $options Custom options
+     *
+     * @return $this
+     */
+    public function backtrace($caption = null, $limit = 0, $options = DEBUG_BACKTRACE_PROVIDE_OBJECT) {
+        $nr = $this->_backtraceCounter;
+
+        $caption = trim($caption);
+        if (empty($caption)) {
+            $caption = sprintf('Backtrace #%s', ++$this->_backtraceCounter);
+        }
+
+        if (version_compare(PHP_VERSION, '5.4.0') < 0) {
+            $bt = debug_backtrace($options);
+
+            if ($limit > 0) {
+                $bt = array_slice($bt, 0, $limit);
+            }
+        }
+        else {
+            $bt = debug_backtrace($options, $limit);
+        }
+
+        $this->addTab($caption, 'getBacktraceHtml',
+                      array_reverse($bt), $nr);
+
+        return $this;
+    }
+
+    /**
      * Removes all variables.
      *
      * @return $this
@@ -195,13 +233,13 @@ final class phpDeeBuk {
      *
      * @param mixed $val The value to dump.
      * @param string $caption The custom caption to use.
-     * 
+     *
      * @return $this
      */
     public function dump($val, $caption = null) {
         $caption = trim($caption);
         if (empty($caption)) {
-            $caption = sprintf('Dump #%s', ++$this->_analyzeDumpCounter);
+            $caption = sprintf('Dump #%s', ++$this->_dumpCounter);
         }
 
         $this->addTab($caption, 'getDumpHtml',
@@ -396,6 +434,191 @@ final class phpDeeBuk {
                                     gettype($val), $val));
     }
 
+    private function getBacktraceHtml(array $backtrace, $index) {
+        $result = '<ul class="accordion" data-accordion>';
+
+        $btSize = count($backtrace);
+        foreach ($backtrace as $i => $entry) {
+            $file = $entry['file'];
+            $line = $entry['line'];
+
+            // class
+            $class = null;
+            if (isset($entry['class'])) {
+                $class = trim($entry['class']);
+            }
+
+            $func = null;
+            if (isset($entry['function'])) {
+                $func = trim($entry['function']);
+            }
+
+            $funcType = null;
+            if (isset($entry['type'])) {
+                $funcType = trim($entry['type']);
+            }
+
+            $funcArgs = null;
+            if (isset($entry['args'])) {
+                $funcArgs = $entry['args'];
+            }
+
+            $title = 'Step #' . trim($btSize - $i) . ' (';
+            if (!empty($class)) {
+
+            }
+            else {
+
+            }
+            $title .= sprintf('%s; %s', basename($file), $line) . ')';
+
+            $elementId = sprintf('backTrace%s', $i);
+
+            $newAcc = '<li class="accordion-navigation">';
+
+            $newAcc .= '<a href="#' . $elementId . '">' . htmlentities($title) . '</a>';
+
+            $content = '<table class="nameValueTable">';
+            {
+                $content .= '<tbody>';
+                {
+                    // file
+                    $content .= '<tr>';
+                    {
+                        $content .= '<td class="valueName"><strong>File</strong></td>';
+                        $content .= '<td class="valueValue">' . htmlentities($file) . '</td>';
+                    }
+                    $content .= '</tr>';
+
+                    // line
+                    $content .= '<tr>';
+                    {
+                        $content .= '<td class="valueName"><strong>Line</strong></td>';
+                        $content .= '<td class="valueValue">' . htmlentities($line) . '</td>';
+                    }
+                    $content .= '</tr>';
+
+                    if (!empty($class)) {
+                        $content .= '<tr>';
+                        {
+                            $content .= '<td class="valueName"><strong>Class</strong></td>';
+                            $content .= '<td class="valueValue">' . htmlentities($class) . '</td>';
+                        }
+                        $content .= '</tr>';
+
+                        if (!empty($funcType)) {
+                            $method = $func;
+
+                            if (!empty($method)) {
+                                $content .= '<tr>';
+                                {
+                                    $content .= '<td class="valueName"><strong>Method</strong></td>';
+                                    $content .= '<td class="valueValue">' . htmlentities($method) . '</td>';
+                                }
+                                $content .= '</tr>';
+                            }
+                        }
+                    }
+                    else {
+                        if (!empty($func)) {
+                            $content .= '<tr>';
+                            {
+                                $content .= '<td class="valueName"><strong>Function</strong></td>';
+                                $content .= '<td class="valueValue">' . htmlentities($func) . '</td>';
+                            }
+                            $content .= '</tr>';
+                        }
+                    }
+
+                    if (is_array($funcArgs)) {
+                        if (!empty($funcArgs)) {
+                            // try find reflector by function / method
+                            $reflector = null;
+                            if (!empty($func)) {
+                                if (empty($class)) {
+                                    $reflector = new \ReflectionFunction($func);
+                                }
+                                else {
+                                    $rc = new \ReflectionClass($class);
+                                    foreach ($rc->getMethods() as $m) {
+                                        if ($m->getName() == $func) {
+                                            $reflector = $m;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+
+                            $content .= '<tr>';
+                            {
+                                $argList = '<table class="argumentTable">';
+                                {
+                                    $argList .= '<thead>';
+                                    $argList .= '<tr>';
+                                    $argList .= '<th class="argName">Name</th>';
+                                    $argList .= '<th class="argType">Type</th>';
+                                    $argList .= '<th>Value</th>';
+                                    $argList .= '</tr>';
+                                    $argList .= '</thead>';
+
+                                    $argList .= '<tbody>';
+                                    foreach ($funcArgs as $faNr => $faVal) {
+                                        $faName = '#'. trim($faNr + 1);
+                                        if (!is_null($reflector)) {
+                                            // try find parameter
+
+                                            $params = $reflector->getParameters();
+                                            if (isset($params[$faNr])) {
+                                                $faName = '$' . $params[$faNr]->getName();
+                                            }
+                                        }
+
+                                        $fsValType = '(null)';
+                                        if (!is_null($faVal)) {
+                                            if (is_object($faVal)) {
+                                                $fsValType = sprintf('object (%s)', get_class($faVal));
+                                                if (method_exists($faVal, '__toString')) {
+                                                    $fsValType = $faVal->__toString();
+                                                }
+                                            }
+                                            else {
+                                                $fsValType = gettype($faVal);
+                                            }
+                                        }
+
+                                        $argList .= '<tr>';
+                                        $argList .= '<td>' . htmlentities($faName) . '</td>';
+                                        $argList .= '<td>' . htmlentities($fsValType) . '</td>';
+                                        $argList .= '<td><pre>' . self::parseForHtmlOutput(self::valueToString($faVal, true)) . '</pre></td>';
+                                        $argList .= '</tr>';
+                                    }
+                                    $argList .= '</tbody>';
+                                }
+                                $argList .= '</table>';
+
+                                $content .= '<td class="valueName"><strong>Arguments</strong></td>';
+                                $content .= '<td class="valueValue">' . $argList . '</td>';
+                            }
+                            $content .= '</tr>';
+                        }
+                    }
+                }
+                $content .= '</tbody>';
+            }
+            $content .= '</table>';
+
+            $newAcc .= '<div id="' . $elementId . '" class="content">' . $content . '</div>';
+
+            $newAcc .= '</li>';
+
+            $result .= $newAcc;
+        }
+
+        $result .= '</ul>';
+
+        return $result;
+    }
+
     private static function getCheckVarNamePredicate($namesOrPattern) {
         if (is_array($namesOrPattern) || ($namesOrPattern instanceof \Traversable)) {
             // list of variable names
@@ -491,13 +714,27 @@ section {
     padding: 0.5em !important;
 }
 
-table.memberTable, table.aboutTable {
+table td {
+    vertical-align: top;
+}
+
+table th {
+    vertical-align: middle;
+}
+
+table.memberTable, table.aboutTable, table.nameValueTable, table.argumentTable {
     width: 100%;
 }
 
 table.memberTable th.memberName,
-table.aboutTable td.colLeft {
+table.aboutTable td.colLeft,
+table.nameValueTable td.valueName {
     width: 15em;
+}
+
+table.argumentTable th.argName,
+table.argumentTable th.argType {
+    width: 7em;
 }
 
 pre.debuggerConsole {
@@ -7282,6 +7519,52 @@ th {
         return $defValue;
     }
 
+    /**
+     * Returns all variables as array.
+     *
+     * @param string|\Traversable|array ... List of variables to remove.
+     *                                      If an argument is a string, it is used as regular expression pattern.
+     *                                      If an argument is an array or traversable it is checked by variable name.
+     *                                      If argument list is EMPTY, all variables are returned.
+     *
+     * @return array The variables.
+     */
+    public function getVarArray() {
+        $result = array();
+
+        foreach ($this->_vars as $v) {
+            $add = false;
+
+            if (func_num_args() < 1) {
+                // add all
+                $add = true;
+            }
+            else {
+                foreach (func_get_args() as $arg) {
+                    $predicate = self::getCheckVarNamePredicate($arg);
+
+                    if (false !== $predicate) {
+                        if (call_user_func($predicate, $v->name)) {
+                            $add = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if ($add) {
+                $result[$v->name] = $v->value;
+            }
+        }
+
+        // sort keys
+        uksort($result, function($x, $y) {
+            return strcmp($x, $y);
+        });
+
+        return $result;
+    }
+
     private function getVarEntryByName($name) {
         $name = self::getVarName($name);
 
@@ -7302,10 +7585,11 @@ th {
      * @return string The output value.
      */
     public static function getVarName($name) {
-        $result = self::valueToString($name);
-        $result = trim(strtoupper($result));
+        $result = trim(self::valueToString($name));
 
-        return $result;
+        $result = str_ireplace(' ', '_', $result);
+
+        return strtoupper($result);
     }
 
     /**
@@ -7343,7 +7627,7 @@ th {
 
         $result = str_ireplace("\r", ''      , $result);
         $result = str_ireplace("\t", '    '  , $result);
-        $result = str_ireplace(' ' , '_'     , $result);
+        $result = str_ireplace(' ' , '&nbsp;', $result);
         $result = str_ireplace("\n", '<br />', $result);
 
         return $result;
@@ -7676,10 +7960,11 @@ th {
     public function reset() {
         $this->clr();
 
-        $this->_analyzeDumpCounter = 0;
-        $this->_analyzeObjCounter  = 0;
-        $this->_analyzeValCounter  = 0;
-        $this->_tabs               = array();
+        $this->_analyzeObjCounter = 0;
+        $this->_analyzeValCounter = 0;
+        $this->_backtraceCounter  = 0;
+        $this->_dumpCounter       = 0;
+        $this->_tabs              = array();
 
         $this->resetColors();
         $this->resetStyles();
@@ -7841,7 +8126,7 @@ th {
             $predicate = self::getCheckVarNamePredicate($nameOrPattern);
             if (false !== $predicate) {
                 foreach ($this->_vars as $i => $v) {
-                    if (call_user_func($predicate, $v->name, $v->value)) {
+                    if (call_user_func($predicate, $v->name)) {
                         // matches => unset
                         unset($this->_vars[$i]);
                     }
@@ -7856,15 +8141,30 @@ th {
      * Converts a value to a string.
      *
      * @param mixed $value The value to convert.
+     * @param bool $noVarExport If true and value cannot be converted to a string, the type name is returned
+     *                          instead of doing a var_export() call.
      *
      * @return string The converted value.
      */
-    public static function valueToString($value) {
+    public static function valueToString($value, $noVarExport = false) {
+        if (is_string($value)) {
+            return $value;
+        }
+
+        if (is_null($value)) {
+            return '(null)';
+        }
+
+        if (is_bool($value)) {
+            return $value ? '(true)' : '(false)';
+        }
+
         if (!is_array($value)) {
             if (!is_object($value)) {
-                $str = settype($value, 'string');
-                if (false !== $str) {
-                    return $str;
+                $valueToConvert = $value;
+
+                if (settype($valueToConvert, 'string')) {
+                    return $valueToConvert;
                 }
             }
             else {
@@ -7872,6 +8172,14 @@ th {
                     return $value->__toString();
                 }
             }
+        }
+
+        if ($noVarExport) {
+            if (is_object($value)) {
+                return get_class($value);
+            }
+
+            return gettype($value);
         }
 
         return var_export($value, true);
@@ -7885,12 +8193,12 @@ th {
      * @return $this
      */
     public function write($str) {
-        $newEntry               = new \stdClass();
-        $newEntry->bgColor      = $this->_bgColor;
-        $newEntry->fgColor      = $this->_fgColor;
-        $newEntry->isBold       = $this->_isBold;
-        $newEntry->isUnderline  = $this->_isUnderline;
-        $newEntry->value        = $str;
+        $newEntry              = new \stdClass();
+        $newEntry->bgColor     = $this->_bgColor;
+        $newEntry->fgColor     = $this->_fgColor;
+        $newEntry->isBold      = $this->_isBold;
+        $newEntry->isUnderline = $this->_isUnderline;
+        $newEntry->value       = $str;
 
         $this->_console[] = $newEntry;
         return $this;
@@ -7904,10 +8212,13 @@ th {
      * @return $this
      */
     public function writeFormat($format) {
-        $str = call_user_func_array('sprintf',
-                                    func_get_args());
+        $args = array();
+        foreach(func_get_args() as $a) {
+            $args[] = self::valueToString($a);
+        }
 
-        return $this->write($str);
+        return $this->write(call_user_func_array('sprintf',
+                                                 $args));
     }
 
     /**
@@ -7918,6 +8229,7 @@ th {
      * @return $this
      */
     public function writeLine($str = null) {
-        return $this->write(strval($str) . "\n");
+        return $this->write($str)
+                    ->write("\n");
     }
 }
