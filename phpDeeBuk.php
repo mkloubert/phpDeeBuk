@@ -28,6 +28,10 @@ final class phpDeeBuk {
     /**
      * @var int
      */
+    private $_analyzeDumpCounter;
+    /**
+     * @var int
+     */
     private $_analyzeObjCounter;
     /**
      * @var int
@@ -36,11 +40,27 @@ final class phpDeeBuk {
     /**
      * @var string
      */
+    private $_bgColor;
+    /**
+     * @var string
+     */
     private $_console;
+    /**
+     * @var string
+     */
+    private $_fgColor;
     /**
      * @var array
      */
     private static $_instances = array();
+    /**
+     * @var bool
+     */
+    private $_isBold;
+    /**
+     * @var bool
+     */
+    private $_isUnderline;
     /**
      * @var string
      */
@@ -49,6 +69,10 @@ final class phpDeeBuk {
      * @var array
      */
     private $_tabs;
+    /**
+     * @var array
+     */
+    private $_vars;
 
 
     private function __construct() {
@@ -64,12 +88,14 @@ final class phpDeeBuk {
     /**
      * Adds a value/object for analyzation.
      *
-     * @param $val The value / object to add.
-     * @param null $caption The optional caption to use.
+     * @param mixed $val The value / object to add.
+     * @param string $caption The optional caption to use.
      *
      * @return $this
      */
     public function analyze($val, $caption = null) {
+        $nr = -1;
+
         $caption = trim($caption);
         if (empty($caption)) {
             if (is_object($val)) {
@@ -91,12 +117,56 @@ final class phpDeeBuk {
     }
 
     /**
+     * Checks if all variables are set or not.
+     *
+     * @param string|\Traversable|array ... List of variables to remove.
+     *                                      If an argument is a string, it is used as regular expression pattern.
+     *                                      If an argument is an array or traversable it is checked by variable name.
+     *
+     * @return bool Are set or not.
+     */
+    public function areVarsSet() {
+        for ($i = 0; $i < func_num_args(); $i++) {
+            $nameOrPattern = func_get_arg($i);
+
+            $found = false;
+
+            $predicate = self::getCheckVarNamePredicate($nameOrPattern);
+            if (false !== $predicate) {
+                foreach ($this->_vars as $i => $v) {
+                    if (call_user_func($predicate, $v->name)) {
+                        // matches
+                        $found = true;
+                    }
+                }
+            }
+
+            if (!$found) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Removes all variables.
+     *
+     * @return $this
+     */
+    public function clearVars() {
+        $this->_vars = array();
+
+        return $this;
+    }
+
+    /**
      * Clears the console output.
      *
      * @return phpDeeBuk $this
      */
     public function clr() {
-        $this->_console = '';
+        $this->_console = array();
         return $this;
     }
 
@@ -120,6 +190,26 @@ final class phpDeeBuk {
         return $result;
     }
 
+    /**
+     * Dumps a value.
+     *
+     * @param mixed $val The value to dump.
+     * @param string $caption The custom caption to use.
+     * 
+     * @return $this
+     */
+    public function dump($val, $caption = null) {
+        $caption = trim($caption);
+        if (empty($caption)) {
+            $caption = sprintf('Dump #%s', ++$this->_analyzeDumpCounter);
+        }
+
+        $this->addTab($caption, 'getDumpHtml',
+                      $val);
+
+        return $this;
+    }
+
     private function getAnalyzeHtml($val, $index) {
         if (is_object($val)) {
             return $this->getAnalyzeHtml_Object($val, $index);
@@ -135,23 +225,23 @@ final class phpDeeBuk {
 
         $result .= '<h4>About</h4>';
         {
-            $result .= '<table style="width: 100%;">';
+            $result .= '<table class="aboutTable">';
 
             $result .= '<tbody>';
             $result .= '<tr>';
-            $result .= '<td><strong>Name</strong></td>';
-            $result .= '<td>' . htmlentities($reflector->getShortName()) . '</td>';
+            $result .= '<td class="colLeft"><strong>Name</strong></td>';
+            $result .= '<td class="colRight">' . htmlentities($reflector->getShortName()) . '</td>';
             $result .= '</tr>';
 
             $result .= '<tr>';
-            $result .= '<td><strong>Namespace</strong></td>';
-            $result .= '<td>' . htmlentities($reflector->getNamespaceName()) . '</td>';
+            $result .= '<td class="colLeft"><strong>Namespace</strong></td>';
+            $result .= '<td class="colRight">' . htmlentities($reflector->getNamespaceName()) . '</td>';
             $result .= '</tr>';
             $result .= '</tbody>';
 
             $result .= '<tr>';
-            $result .= '<td><strong>File</strong></td>';
-            $result .= '<td>' . htmlentities($reflector->getFileName()) . '</td>';
+            $result .= '<td class="colLeft"><strong>File</strong></td>';
+            $result .= '<td class="colRight">' . htmlentities($reflector->getFileName()) . '</td>';
             $result .= '</tr>';
             $result .= '</tbody>';
 
@@ -306,13 +396,30 @@ final class phpDeeBuk {
                                     gettype($val), $val));
     }
 
-    /**
-     * Returns the current content of the console buffer.
-     *
-     * @return string The console buffer.
-     */
-    public function getConsole() {
-        return $this->_console;
+    private static function getCheckVarNamePredicate($namesOrPattern) {
+        if (is_array($namesOrPattern) || ($namesOrPattern instanceof \Traversable)) {
+            // list of variable names
+
+            return function($name) use ($namesOrPattern) {
+                foreach ($namesOrPattern as $varName) {
+                    if ($name == phpDeeBuk::getVarName($varName)) {
+                        // found
+                        return true;
+                    }
+                }
+
+                return false;
+            };
+        }
+        else {
+            // regex patter
+
+            return function($name) use ($namesOrPattern) {
+                return 1 === preg_match($namesOrPattern, $name);
+            };
+        }
+
+        return false;
     }
 
     /**
@@ -324,12 +431,37 @@ final class phpDeeBuk {
      * @return string The console buffer.
      */
     public function getConsoleHtml($withTags = false) {
-        $result = htmlentities($this->getConsole());
+        $result = '';
+        foreach ($this->_console as $item) {
+            $htmlToAppend = '<span';
 
-        $result = str_ireplace("\r", ''      , $result);
-        $result = str_ireplace("\t", '    '  , $result);
-        $result = str_ireplace(' ' , "&nbsp;", $result);
-        $result = str_ireplace("\n", "<br />", $result);
+            // define styles
+            $styles = array();
+            if (!empty($item->bgColor)) {
+                $styles[] = "background-color: {$item->bgColor};";
+            }
+            if (!empty($item->fgColor)) {
+                $styles[] = "color: {$item->fgColor};";
+            }
+            if ($item->isBold) {
+                $styles[] = "font-weight: bold;";
+            }
+            if ($item->isUnderline) {
+                $styles[] = "text-decoration: underline;";
+            }
+
+            if (!empty($styles)) {
+                $htmlToAppend .= ' style="' . implode(' ', $styles) . '"';
+            }
+            $htmlToAppend .= '>';
+
+            // value
+            $htmlToAppend .= self::parseForHtmlOutput($item->value);
+
+            $htmlToAppend .= '</span>';
+
+            $result .= $htmlToAppend;
+        }
 
         if ($withTags) {
             return "<pre class=\"debuggerConsole\">{$result}</pre>";
@@ -359,17 +491,19 @@ section {
     padding: 0.5em !important;
 }
 
-table.memberTable {
+table.memberTable, table.aboutTable {
     width: 100%;
 }
 
-table.memberTable th.memberName {
+table.memberTable th.memberName,
+table.aboutTable td.colLeft {
     width: 15em;
 }
 
 pre.debuggerConsole {
-    background-color: #eee;
-    height: 100%;
+    background-color: #000;
+    color: #fff;
+    height: 80%;
     padding: 0.5em;
 }
 ';
@@ -378,6 +512,70 @@ pre.debuggerConsole {
             $result .= '
 </style>
 ';
+        }
+
+        return $result;
+    }
+
+    private static function getCssColor($cssColor) {
+        $result = trim($cssColor);
+        if (empty($result)) {
+            $result = null;
+        }
+
+        if (!empty($result)) {
+            if (1 === preg_match("/^(?:[0-9a-fA-F]{3}){1,2}$/", $result)) {
+                // hex color without leading #
+                $result = '#' . $result;
+            }
+        }
+
+        return $result;
+    }
+
+    private function getDumpHtml($val) {
+        $result = '';
+
+        $valueType = '(null)';
+        if (!is_null($val)) {
+            if (is_object($val)) {
+                $valueType = get_class($val);
+            }
+            else {
+                $valueType = gettype($val);
+            }
+        }
+
+        $result .= '<h4>About</h4>';
+        {
+            $result .= '<table class="aboutTable">';
+
+            $result .= '<tbody>';
+
+            $result .= '<tr>';
+            $result .= '<td class="colLeft"><strong>Type</strong></td>';
+            $result .= '<td class="colRight">' . htmlentities($valueType) . '</td>';
+            $result .= '</tr>';
+
+            if (is_object($val)) {
+                $reflector = new \ReflectionObject($val);
+
+                $result .= '<tr>';
+                $result .= '<td class="colLeft"><strong>File</strong></td>';
+                $result .= '<td class="colRight">' . htmlentities($reflector->getFileName()) . '</td>';
+                $result .= '</tr>';
+            }
+
+            $result .= '</tbody>';
+
+            $result .= '</table>';
+        }
+
+        // output value
+        $result .= '<h4>Dump</h4>';
+        {
+            $export = var_export($val, true);
+            $result .= '<pre>' . self::parseForHtmlOutput($export) . '</pre>';
         }
 
         return $result;
@@ -6523,7 +6721,7 @@ pre.debuggerConsole {
      *
      * @param string $name The optional name of the instance.
      *
-     * @return phpDeeBuk The instance.
+     * @return phpDeeBuk
      */
     public static function getInstance($name = null) {
         $name = str_ireplace("\t", '    ', $name);
@@ -6538,10 +6736,7 @@ pre.debuggerConsole {
             self::$_instances[$name] = $newInstance;
         }
 
-        $result        = self::$_instances[$name];
-        $result->_name = $name;
-
-        return $result;
+        return self::$_instances[$name];
     }
 
     /**
@@ -7070,6 +7265,60 @@ th {
         return $result;
     }
 
+    /**
+     * Returns the value of a variable.
+     *
+     * @param string $name The name of the variable.
+     * @param mixed $defValue The default value.
+     *
+     * @return mixed The value of the variable.
+     */
+    public function getVar($name, $defValue = null) {
+        $item = $this->getVarEntryByName($name);
+        if (is_object($item)) {
+            return $item->value;
+        }
+
+        return $defValue;
+    }
+
+    private function getVarEntryByName($name) {
+        $name = self::getVarName($name);
+
+        foreach ($this->_vars as $v) {
+            if ($v->name == $name) {
+                return $v;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Normalizes a value that should be used as variable name.
+     *
+     * @param mixed $name The input value.
+     *
+     * @return string The output value.
+     */
+    public static function getVarName($name) {
+        $result = self::valueToString($name);
+        $result = trim(strtoupper($result));
+
+        return $result;
+    }
+
+    /**
+     * Checks if a variable is set or not.
+     *
+     * @param string $name The name to check.
+     *
+     * @return bool Is set or not.
+     */
+    public function issetVar($name) {
+        return is_object($this->getVarEntryByName($name));
+    }
+
     private static function outputToStream($data, $outputLogic = null) {
         if (is_null($outputLogic)) {
             $outputLogic = function($data) {
@@ -7087,6 +7336,17 @@ th {
 
         $outputLogic($data);
         return true;
+    }
+
+    private static function parseForHtmlOutput($str) {
+        $result = htmlentities(self::valueToString($str));
+
+        $result = str_ireplace("\r", ''      , $result);
+        $result = str_ireplace("\t", '    '  , $result);
+        $result = str_ireplace(' ' , '_'     , $result);
+        $result = str_ireplace("\n", '<br />', $result);
+
+        return $result;
     }
 
     /**
@@ -7147,8 +7407,6 @@ th {
 
         $result .= "var p = window.open('', 'phpDeeBuk', 'width=800,height=600,resizable=yes,scrollbars=yes');\n";
         $result .= "\n";
-
-        // $result .= "e = p.document.\n";
 
         $result .= "p.document.open();\n";
         $result .= "p.document.write('<html class=\"no-js\"><head></head><body></body></html>');\n";
@@ -7417,12 +7675,206 @@ th {
      */
     public function reset() {
         $this->clr();
-        $this->_tabs = array();
 
-        $this->_analyzeObjCounter = 0;
-        $this->_analyzeValCounter = 0;
+        $this->_analyzeDumpCounter = 0;
+        $this->_analyzeObjCounter  = 0;
+        $this->_analyzeValCounter  = 0;
+        $this->_tabs               = array();
+
+        $this->resetColors();
+        $this->resetStyles();
+
+        $this->clearVars();
 
         return $this;
+    }
+
+    /**
+     * Resets the console colors to default.
+     *
+     * @return $this
+     */
+    public function resetColors() {
+        $this->_bgColor = null;
+        $this->_fgColor = null;
+
+        return $this;
+    }
+
+    /**
+     * Resets all text styles of the console.
+     *
+     * @return $this
+     */
+    public function resetStyles() {
+        $this->_isBold      = false;
+        $this->_isUnderline = false;
+
+        return $this;
+    }
+
+    /**
+     * Sets the background color for the console.
+     *
+     * @param string $cssColor The CSS color.
+     *
+     * @return $this
+     */
+    public function setBackgroundColor($cssColor) {
+        $cssColor = self::getCssColor($cssColor);
+        if (false !== $cssColor) {
+            $this->_bgColor = $cssColor;
+        }
+
+        return $this;
+    }
+
+    /**
+     * Defines if console should output text bold or not.
+     *
+     * @param bool $isBold Output bold or not.
+     *
+     * @return $this
+     */
+    public function setBold($isBold = true) {
+        $this->_isBold = $isBold ? true : false;
+
+        return $this;
+    }
+
+    /**
+     * Sets the text color for the console.
+     *
+     * @param string $cssColor The CSS color.
+     *
+     * @return $this
+     */
+    public function setForegroundColor($cssColor) {
+        $cssColor = self::getCssColor($cssColor);
+        if (false !== $cssColor) {
+            $this->_fgColor = $cssColor;
+        }
+
+        return $this;
+    }
+
+    /**
+     * Defines if console should output text underline or not.
+     *
+     * @param bool $isUnderline Output underline or not.
+     *
+     * @return $this
+     */
+    public function setUnderline($isUnderline = true) {
+        $this->_isUnderline = $isUnderline ? true : false;
+
+        return $this;
+    }
+
+    /**
+     * Sets a variable.
+     *
+     * @param string $name The name of the variable.
+     * @param mixed $value The value to set.
+     *
+     * @return $this
+     */
+    public function setVar($name, $value) {
+        $item = $this->getVarEntryByName($name);
+        if (!is_object($item)) {
+            $item       = new \stdClass();
+            $item->name = self::getVarName($name);
+
+            $this->_vars[] = $item;
+        }
+
+        $item->value = $value;
+        return $this;
+    }
+
+    /**
+     * Sets a range of variables.
+     *
+     * @param \Traversable|array $values The values to set. The keys are the names of the variables.
+     *
+     * @return $this
+     */
+    public function setVarRange($values) {
+        foreach ($values as $n => $v) {
+            $this->setVar($n, $v);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Unsets a variable.
+     *
+     * @param string $name The name of the variable.
+     *
+     * @return $this
+     */
+    public function unsetVar($name) {
+        $name = self::getVarName($name);
+        foreach ($this->_vars as $i => $v) {
+            if ($v->name == $name) {
+                unset($this->_vars[$i]);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * Unsets a range of variables.
+     *
+     * @param string|\Traversable|array ... List of variables to remove.
+     *                                      If an argument is a string, it is used as regular expression pattern.
+     *                                      If an argument is an array or traversable it is checked by variable name.
+     *
+     * @return $this
+     */
+    public function unsetVarRange() {
+        for ($i = 0; $i < func_num_args(); $i++) {
+            $nameOrPattern = func_get_arg($i);
+
+            $predicate = self::getCheckVarNamePredicate($nameOrPattern);
+            if (false !== $predicate) {
+                foreach ($this->_vars as $i => $v) {
+                    if (call_user_func($predicate, $v->name, $v->value)) {
+                        // matches => unset
+                        unset($this->_vars[$i]);
+                    }
+                }
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * Converts a value to a string.
+     *
+     * @param mixed $value The value to convert.
+     *
+     * @return string The converted value.
+     */
+    public static function valueToString($value) {
+        if (!is_array($value)) {
+            if (!is_object($value)) {
+                $str = settype($value, 'string');
+                if (false !== $str) {
+                    return $str;
+                }
+            }
+            else {
+                if (method_exists($value, '__toString')) {
+                    return $value->__toString();
+                }
+            }
+        }
+
+        return var_export($value, true);
     }
 
     /**
@@ -7433,7 +7885,14 @@ th {
      * @return $this
      */
     public function write($str) {
-        $this->_console .= strval($str);
+        $newEntry               = new \stdClass();
+        $newEntry->bgColor      = $this->_bgColor;
+        $newEntry->fgColor      = $this->_fgColor;
+        $newEntry->isBold       = $this->_isBold;
+        $newEntry->isUnderline  = $this->_isUnderline;
+        $newEntry->value        = $str;
+
+        $this->_console[] = $newEntry;
         return $this;
     }
 
@@ -7448,7 +7907,7 @@ th {
         $str = call_user_func_array('sprintf',
                                     func_get_args());
 
-        return $this->writeLine($str);
+        return $this->write($str);
     }
 
     /**
@@ -7458,7 +7917,7 @@ th {
      *
      * @return $this
      */
-    public function writeLine($str = '') {
+    public function writeLine($str = null) {
         return $this->write(strval($str) . "\n");
     }
 }

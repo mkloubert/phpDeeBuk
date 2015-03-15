@@ -1,3 +1,8 @@
+<?php
+
+namespace MyNamespace;
+
+?>
 <html>
 <body>
 <?php
@@ -20,7 +25,7 @@ class MyClass {
     }
 }
 
-$dbg = phpDeeBuk::getInstance();
+$dbg = \phpDeeBuk::getInstance();
 
 $a = 1000;
 
@@ -29,14 +34,16 @@ $o->B = 5979;
 
 $dbg->writeLine('Hello')
     ->write('world!')
-    ->writeFormat(' %s %s', 1, 2)
+    ->setForegroundColor('ff0')
+    ->setUnderline()->writeFormat(' %s %s', 1, 2)->setUnderline(false)
+    ->resetColors()
     ->writeLine()
     ->write('TM')
-    ->analyze($a)
-    ->analyze(new MyClass());
+    ->analyze($a, 'testValue')
+    ->analyze($o)
+    ->dump($o);
 
 $dbg->renderAndOutput();
-
 
 
 ?>
