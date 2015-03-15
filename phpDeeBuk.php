@@ -7438,13 +7438,27 @@ th {
     }
 
     /**
+     * Writes a formatted string.
+     *
+     * @param string $format The format string.
+     *
+     * @return $this
+     */
+    public function writeFormat($format) {
+        $str = call_user_func_array('sprintf',
+                                    func_get_args());
+
+        return $this->writeLine($str);
+    }
+
+    /**
      * Writes data to the console and appends a new line.
      *
      * @param mixed $str The data to write.
      *
      * @return $this
      */
-    public function writeLine($str) {
+    public function writeLine($str = '') {
         return $this->write(strval($str) . "\n");
     }
 }

@@ -29,6 +29,9 @@ $o->B = 5979;
 
 $dbg->writeLine('Hello')
     ->write('world!')
+    ->writeFormat(' %s %s', 1, 2)
+    ->writeLine()
+    ->write('TM')
     ->analyze($a)
     ->analyze(new MyClass());
 
