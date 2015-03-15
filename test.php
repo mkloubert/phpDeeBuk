@@ -57,6 +57,9 @@ $dbg->backtrace();
 $o->c($dbg);
 myFunc($dbg);
 
+$dbg->assertFalse(false);
+$dbg->assertTrue(1 == 2, 'My test');
+
 $dbg->renderAndOutput();
 
 

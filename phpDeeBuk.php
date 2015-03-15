@@ -24,7 +24,7 @@
  *
  * @author Marcel Joachim Kloubert <marcel.kloubert@gmx.net>
  */
-final class phpDeeBuk {
+final class phpDeeBuk implements \ArrayAccess {
     /**
      * @var int
      */
@@ -33,6 +33,14 @@ final class phpDeeBuk {
      * @var int
      */
     private $_analyzeValCounter;
+    /**
+     * @var int
+     */
+    private $_assertCounter = 0;
+    /**
+     * @var array
+     */
+    private $_asserts;
     /**
      * @var int
      */
@@ -83,6 +91,11 @@ final class phpDeeBuk {
         $this->reset();
     }
 
+
+    private function addAssert() {
+        $this->_asserts[] = call_user_func_array(array($this, 'createAssertEntry'),
+                                                 func_get_args());
+    }
 
     private function addTab() {
         $this->_tabs[] = call_user_func_array(array($this, 'createTabEntry'),
@@ -154,6 +167,90 @@ final class phpDeeBuk {
     }
 
     /**
+     * Tests if two values are equal.
+     *
+     * @param mixed $x The left value.
+     * @param mixed $y The right value.
+     * @param string null $caption
+     *
+     * @return phpDeeBuk
+     */
+    public function assertEqual($x, $y, $caption = null) {
+        return $this->assertTrue($x == $y,
+                                 $caption);
+    }
+
+    /**
+     * Tests if two values have exactly the same value.
+     *
+     * @param mixed $x The left value.
+     * @param mixed $y The right value.
+     * @param string $caption The custom caption to use.
+     *
+     * @return $this
+     */
+    public function assertExact($x, $y, $caption = null) {
+        return $this->assertTrue($x === $y,
+                                 $caption);
+    }
+
+    /**
+     * Tests if a value is exactly false.
+     *
+     * @param mixed $value The value to check.
+     * @param string $caption The custom caption to use.
+     *
+     * @return $this
+     */
+    public function assertFalse($value, $caption = null) {
+        return $this->assertTrue(false === $value,
+                                 $caption);
+    }
+
+    /**
+     * Tests if two values are NOT equal.
+     *
+     * @param mixed $x The left value.
+     * @param mixed $y The right value.
+     * @param string $caption The custom caption to use.
+     *
+     * @return $this
+     */
+    public function assertNotEqual($x, $y, $caption = null) {
+        return $this->assertTrue($x != $y,
+                                 $caption);
+    }
+
+    /**
+     * Tests if two values have NOT exactly the same value.
+     *
+     * @param mixed $x The left value.
+     * @param mixed $y The right value.
+     * @param string $caption The custom caption to use.
+     *
+     * @return $this
+     */
+    public function assertNotExact($x, $y, $caption = null) {
+        return $this->assertTrue($x !== $y,
+                                 $caption);
+    }
+
+    /**
+     * Tests if a value is exactly true.
+     *
+     * @param mixed $value The value to check.
+     * @param string $caption The custom caption to use.
+     *
+     * @return $this
+     */
+    public function assertTrue($value, $caption = null) {
+        $this->addAssert(true === $value,
+                         $caption);
+
+        return $this;
+    }
+
+    /**
      * Does a debug_backtrace.
      *
      * @param string $caption The custom caption to use.
@@ -206,6 +303,27 @@ final class phpDeeBuk {
     public function clr() {
         $this->_console = array();
         return $this;
+    }
+
+    private function createAssertEntry($succeeded, $caption) {
+        if (!is_callable($succeeded)) {
+            $valueToCheck = $succeeded;
+
+            $succeeded = function() use ($valueToCheck) {
+                return true === $valueToCheck;
+            };
+        }
+
+        $caption = trim($caption);
+        if (empty($caption)) {
+            $caption = 'Test #' . trim(++$this->_assertCounter);
+        }
+
+        $result          = new \stdClass();
+        $result->caption = $caption;
+        $result->state   = call_user_func($succeeded) ? 0 : 1;
+
+        return $result;
     }
 
     private function createTabEntry($title, $method) {
@@ -434,6 +552,31 @@ final class phpDeeBuk {
                                     gettype($val), $val));
     }
 
+    private function getAssertHtml() {
+        $result = '<ul class="accordion" data-accordion>';
+        {
+            foreach ($this->_asserts as $i => $assert) {
+                $newAcc = '<li class="accordion-navigation">';
+                {
+                    $elementId = "assert{$i}";
+
+                    $cssClass = ' testSucceeded';
+                    if (1 == $assert->state) {
+                        $cssClass = ' testFailed';
+                    }
+
+                    $newAcc .= '<a href="#' . trim($elementId) . '" class=' . $cssClass .'>' . htmlentities($assert->caption) . '</a>';
+                }
+                $newAcc .= '</li>';
+
+                $result .= $newAcc;
+            }
+        }
+        $result .= '</ul>';
+
+        return $result;
+    }
+
     private function getBacktraceHtml(array $backtrace, $index) {
         $result = '<ul class="accordion" data-accordion>';
 
@@ -463,6 +606,7 @@ final class phpDeeBuk {
                 $funcArgs = $entry['args'];
             }
 
+            //TODO
             $title = 'Step #' . trim($btSize - $i) . ' (';
             if (!empty($class)) {
 
@@ -742,6 +886,17 @@ pre.debuggerConsole {
     color: #fff;
     height: 80%;
     padding: 0.5em;
+}
+
+.testFailed {
+    background-color: #cf2a0e !important;
+    color: #fff !important;
+    font-weight: bold !important;
+}
+
+.testSucceeded {
+    background-color: #43ac6a !important;
+    color: #fff !important;
 }
 ';
 
@@ -7603,6 +7758,68 @@ th {
         return is_object($this->getVarEntryByName($name));
     }
 
+    /**
+     * (PHP 5 &gt;= 5.0.0)<br/>
+     * Whether a offset exists
+     * @link http://php.net/manual/en/arrayaccess.offsetexists.php
+     * @param mixed $offset <p>
+     * An offset to check for.
+     * </p>
+     * @return boolean true on success or false on failure.
+     * </p>
+     * <p>
+     * The return value will be casted to boolean if non-boolean was returned.
+     */
+    public function offsetExists($offset)
+    {
+        return $this->issetVar($offset);
+    }
+
+    /**
+     * (PHP 5 &gt;= 5.0.0)<br/>
+     * Offset to retrieve
+     * @link http://php.net/manual/en/arrayaccess.offsetget.php
+     * @param mixed $offset <p>
+     * The offset to retrieve.
+     * </p>
+     * @return mixed Can return all value types.
+     */
+    public function offsetGet($offset)
+    {
+        return $this->getVar($offset, null);
+    }
+
+    /**
+     * (PHP 5 &gt;= 5.0.0)<br/>
+     * Offset to set
+     * @link http://php.net/manual/en/arrayaccess.offsetset.php
+     * @param mixed $offset <p>
+     * The offset to assign the value to.
+     * </p>
+     * @param mixed $value <p>
+     * The value to set.
+     * </p>
+     * @return void
+     */
+    public function offsetSet($offset, $value)
+    {
+        $this->setVar($offset, $value);
+    }
+
+    /**
+     * (PHP 5 &gt;= 5.0.0)<br/>
+     * Offset to unset
+     * @link http://php.net/manual/en/arrayaccess.offsetunset.php
+     * @param mixed $offset <p>
+     * The offset to unset.
+     * </p>
+     * @return void
+     */
+    public function offsetUnset($offset)
+    {
+        $this->unsetVar($offset);
+    }
+
     private static function outputToStream($data, $outputLogic = null) {
         if (is_null($outputLogic)) {
             $outputLogic = function($data) {
@@ -7689,7 +7906,7 @@ th {
         $result .= "var css = " . json_encode(self::getCss()) . ";\n";
         $result .= "\n";
 
-        $result .= "var p = window.open('', 'phpDeeBuk', 'width=800,height=600,resizable=yes,scrollbars=yes');\n";
+        $result .= "var p = window.open('', 'phpDeeBuk{$this->getName()}', 'width=800,height=600,resizable=yes,scrollbars=yes');\n";
         $result .= "\n";
 
         $result .= "p.document.open();\n";
@@ -7744,11 +7961,21 @@ th {
             $result .= "bodyTag.appendChild(e);\n";
         }
 
-        // <body>
+        // <body></body>
         {
             $tabs = array();
 
-            $tabs[] = $this->createTabEntry('Console', 'getConsoleHtml', true);
+            // console
+            if (!empty($this->_console)) {
+                $tabs[] = $this->createTabEntry('Console', 'getConsoleHtml', true);
+            }
+
+            // tests
+            if (!empty($this->_asserts)) {
+                $tabs[] = $this->createTabEntry('Tests', 'getAssertHtml');
+            }
+
+            // add the rest
             foreach ($this->_tabs as $t) {
                 $tabs[] = $t;
             }
@@ -7962,6 +8189,8 @@ th {
 
         $this->_analyzeObjCounter = 0;
         $this->_analyzeValCounter = 0;
+        $this->_assertCounter     = 0;
+        $this->_asserts           = array();
         $this->_backtraceCounter  = 0;
         $this->_dumpCounter       = 0;
         $this->_tabs              = array();
