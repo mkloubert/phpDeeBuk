@@ -4,7 +4,24 @@ Debugger that outputs PHP data via JavaScript generated popup.
 
 ## Getting started
 
+* Include [phpDeeBuk class](https://github.com/mkloubert/phpDeeBuk/blob/master/phpDeeBuk.php) to your project.
+* And work:
+
 ```php
+<?php
+
+class MyClass {
+    public $Var2 = 'TM';
+    private $Var1 = 'MK';
+    
+    const MY_CONST = 5979;
+    
+    public function add ($a, $b) {
+        return $a + $b;
+    }
+}
+
+?>
 <html>
   <head>
     <title>phpDeeBuk example</title>
@@ -12,10 +29,37 @@ Debugger that outputs PHP data via JavaScript generated popup.
   
   <body>
 <?php
+    $debugger = phpDeeBuk::getInstance();
+    
+    $myObj = new MyClass();
+    $myVal = 5979;
+    
+    // analyze and dump data
+    $debugger->analyze($myObj, 'My analyzed object')
+             ->dump($myObj, 'My dumped object')
+             ->analyze($myVal, 'My analyzed value')
+             ->dump($myVal, 'My dumped value');
+      
+    // do unit tests       
+    $debugger->assertTrue(1 == '1')  // ok
+             ->assertFalse('2' == 2)  // fails
+             ->assertEqual('3', 3)  // ok
+             ->assertExact('3', 3)  // fails
+             ->assertNotEqual('4', 4)  // fails
+             ->assertNotExact('4', 4, 'My 2nd 4 value check')  // ok (with custom caption)
+             
+    // variables and console
+    $debugger['myVar'] = 23979;
+    $debugger->writeLine($debugger['myVar']);
+    
+    // create JavaScript code with HTML <script> tags
+    $debugger->renderAndOutput();
 ?>
   </body>
 </html>
 ```
+
+Have a look at the examples:
 
 ## Example
 
@@ -87,6 +131,14 @@ $debugger = phpDeeBuk::getInstance();
 $debugger->dump(new MyClass())
          ->dump(23979)
          ->dump('MK', 'My string');  // define custom caption
+```
+
+### Multi instance
+
+```php
+$defDbg = phpDeeBuk::getInstance();
+$dbg1   = phpDeeBuk::getInstance('My debugger');  // new instance
+$dbg2   = phpDeeBuk::getInstance();  // same instance as $defDbg
 ```
 
 ### Test
