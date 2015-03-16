@@ -577,6 +577,15 @@ final class phpDeeBuk implements \ArrayAccess {
         return $result;
     }
 
+    private static function getBacktraceEntryOfCallingLine() {
+        $bt = debug_backtrace();
+
+        $result = $bt[1];
+        unset($bt);
+
+        return $result;
+    }
+
     private function getBacktraceHtml(array $backtrace, $index) {
         $result = '<ul class="accordion" data-accordion>';
 
@@ -7851,6 +7860,28 @@ th {
     }
 
     /**
+     * Prints the calling file to console.
+     *
+     * @return $this
+     */
+    public function printFile() {
+        $e = self::getBacktraceEntryOfCallingLine();
+
+        return $this->write($e['file']);
+    }
+
+    /**
+     * Prints the calling line to console.
+     *
+     * @return $this
+     */
+    public function printLine() {
+        $e = self::getBacktraceEntryOfCallingLine();
+
+        return $this->write($e['line']);
+    }
+
+    /**
      * Renders and outputs the Javascript code based on the current instance.
      * The code is surrounded by a HTML script tag.
      *
@@ -8257,6 +8288,21 @@ th {
     }
 
     /**
+     * Sets the colors for the console.
+     *
+     * @param string $foreColor The CSS text color.
+     * @param string $backColor The CSS background color.
+     *
+     * @return $this
+     */
+    public function setColors($foreColor, $backColor) {
+        $this->setForegroundColor($foreColor)
+             ->setBackgroundColor($backColor);
+
+        return $this;
+    }
+
+    /**
      * Sets the text color for the console.
      *
      * @param string $cssColor The CSS color.
@@ -8381,11 +8427,11 @@ th {
         }
 
         if (is_null($value)) {
-            return '(null)';
+            return '';
         }
 
         if (is_bool($value)) {
-            return $value ? '(true)' : '(false)';
+            return $value ? 'TRUE' : 'FALSE';
         }
 
         if (!is_array($value)) {
