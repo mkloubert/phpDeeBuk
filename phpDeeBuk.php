@@ -2004,6 +2004,32 @@ th {
     }
 
     /**
+     * Renders and outputs the Javascript code based on the current instance
+     * if a condition meets.
+     * The code is surrounded by a HTML script tag.
+     *
+     * @param mixed $condition The condition (a callable or value that returns / represents (true)).
+     * @param resource $stream The optional, custom stream to write the data to.
+     *
+     * @return bool Operation was successful or not.
+     */
+    public function renderAndOutputIf($condition, $stream = null) {
+        if (!is_callable($condition)) {
+            $value = $condition;
+
+            $condition = function() use ($value) {
+                return $value;
+            };
+        }
+
+        if (call_user_func($condition)) {
+            return $this->renderAndOutput($stream);
+        }
+
+        return null;
+    }
+
+    /**
      * Renders and outputs the Javascript code based on the current instance.
      *
      * @param resource $stream The optional, custom stream to write the data to.
@@ -2013,6 +2039,31 @@ th {
     public function renderAndOutputJavascript($stream = null) {
         return self::outputToStream($this->renderJavascript(),
                                     $stream);
+    }
+
+    /**
+     * Renders and outputs the Javascript code based on the current instance
+     * if a condition meets.
+     *
+     * @param mixed $condition The condition (a callable or value that returns / represents (true)).
+     * @param resource $stream The optional, custom stream to write the data to.
+     *
+     * @return bool Operation was successful or not.
+     */
+    public function renderAndOutputJavascriptIf($condition, $stream = null) {
+        if (!is_callable($condition)) {
+            $value = $condition;
+
+            $condition = function() use ($value) {
+                return $value;
+            };
+        }
+
+        if (call_user_func($condition)) {
+            return $this->renderAndOutputJavascript($stream);
+        }
+
+        return null;
     }
 
     /**
