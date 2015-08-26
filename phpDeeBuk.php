@@ -249,6 +249,22 @@ final class phpDeeBuk implements \ArrayAccess {
     }
 
     /**
+     * Checks if a value is an instance of a class.
+     *
+     * @param string $className The name of the class.
+     * @param mixed $value The value to check.
+     * @param string $caption The custom caption to use.
+     *
+     * @return $this
+     */
+    public function assertInstanceOf($className, $value, $caption = null) {
+        $rc = new ReflectionClass($className);
+
+        return $this->assertTrue($rc->isInstance($value),
+                                 $caption);
+    }
+
+    /**
      * Tests if a left value is less than a right one.
      *
      * @param mixed $x The left value.
@@ -314,6 +330,22 @@ final class phpDeeBuk implements \ArrayAccess {
      */
     public function assertNotFileExists($path, $caption = null) {
         return $this->assertTrue(!file_exists($path),
+                                 $caption);
+    }
+
+    /**
+     * Checks if a value is NOT an instance of a class.
+     *
+     * @param string $className The name of the class.
+     * @param mixed $value The value to check.
+     * @param string $caption The custom caption to use.
+     *
+     * @return $this
+     */
+    public function assertNotInstanceOf($className, $value, $caption = null) {
+        $rc = new ReflectionClass($className);
+
+        return $this->assertTrue(!$rc->isInstance($value),
                                  $caption);
     }
 
