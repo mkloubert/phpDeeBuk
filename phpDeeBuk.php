@@ -208,6 +208,75 @@ final class phpDeeBuk implements \ArrayAccess {
     }
 
     /**
+     * Checks if a file / directory exists.
+     *
+     * @param string $path The path of the file.
+     * @param string $caption The custom caption to use.
+     *
+     * @return $this
+     */
+    public function assertFileExists($path, $caption = null) {
+        return $this->assertTrue(file_exists($path),
+                                 $caption);
+    }
+
+    /**
+     * Tests if a left value is greater than a right one.
+     *
+     * @param mixed $x The left value.
+     * @param mixed $y The right value.
+     * @param string $caption The custom caption to use.
+     *
+     * @return $this
+     */
+    public function assertGreaterThan($x, $y, $caption = null) {
+        return $this->assertTrue($x > $y,
+                                 $caption);
+    }
+
+    /**
+     * Tests if a left value is greater (or equal) than a right one.
+     *
+     * @param mixed $x The left value.
+     * @param mixed $y The right value.
+     * @param string $caption The custom caption to use.
+     *
+     * @return $this
+     */
+    public function assertGreaterThanOrEqual($x, $y, $caption = null) {
+        return $this->assertTrue($x >= $y,
+                                 $caption);
+    }
+
+    /**
+     * Tests if a left value is less than a right one.
+     *
+     * @param mixed $x The left value.
+     * @param mixed $y The right value.
+     * @param string $caption The custom caption to use.
+     *
+     * @return $this
+     */
+    public function assertLessThan($x, $y, $caption = null) {
+        return $this->assertTrue($x < $y,
+                                 $caption);
+    }
+
+    /**
+     * Tests if a left value is less (or equal) than a right one.
+     *
+     * @param mixed $x The left value.
+     * @param mixed $y The right value.
+     * @param string $caption The custom caption to use.
+     *
+     * @return $this
+     */
+    public function assertLessThanOrEqual($x, $y, $caption = null) {
+        return $this->assertTrue($x <= $y,
+                                 $caption);
+    }
+
+    /**
      * Tests if two values are NOT equal.
      *
      * @param mixed $x The left value.
@@ -232,6 +301,73 @@ final class phpDeeBuk implements \ArrayAccess {
      */
     public function assertNotExact($x, $y, $caption = null) {
         return $this->assertTrue($x !== $y,
+                                 $caption);
+    }
+
+    /**
+     * Checks if a file / directory does NOT exist.
+     *
+     * @param string $path The path of the file.
+     * @param string $caption The custom caption to use.
+     *
+     * @return $this
+     */
+    public function assertNotFileExists($path, $caption = null) {
+        return $this->assertTrue(!file_exists($path),
+                                 $caption);
+    }
+
+    /**
+     * Tests if a value is NOT (null).
+     *
+     * @param mixed $value The value to check.
+     * @param string $caption The custom caption to use.
+     *
+     * @return $this
+     */
+    public function assertNotNull($value, $caption = null) {
+        return $this->assertTrue(null !== $value,
+                                 $caption);
+    }
+
+    /**
+     * Checks if a string does NOT match a regular expression.
+     *
+     * @param string $pattern The regular expression.
+     * @param string $subject The string to check.
+     * @param string $caption The custom caption to use.
+     *
+     * @return $this
+     */
+    public function assertNotRegExp($pattern, $subject, $caption = null) {
+        return $this->assertTrue(1 !== preg_match($pattern, $subject),
+                                 $caption);
+    }
+
+    /**
+     * Tests if a value is (null).
+     *
+     * @param mixed $value The value to check.
+     * @param string $caption The custom caption to use.
+     *
+     * @return $this
+     */
+    public function assertNull($value, $caption = null) {
+        return $this->assertTrue(null === $value,
+                                 $caption);
+    }
+
+    /**
+     * Checks if a string matches a regular expression.
+     *
+     * @param string $pattern The regular expression.
+     * @param string $subject The string to check.
+     * @param string $caption The custom caption to use.
+     *
+     * @return $this
+     */
+    public function assertRegExp($pattern, $subject, $caption = null) {
+        return $this->assertTrue(1 === preg_match($pattern, $subject),
                                  $caption);
     }
 
