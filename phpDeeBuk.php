@@ -114,7 +114,7 @@ final class phpDeeBuk implements \ArrayAccess {
         $nr = -1;
 
         $caption = trim($caption);
-        if (empty($caption)) {
+        if ('' == $caption) {
             if (is_object($val)) {
                 $nr = ++$this->_analyzeObjCounter;
                 $typeName = 'Object';
@@ -431,7 +431,7 @@ final class phpDeeBuk implements \ArrayAccess {
         $nr = $this->_backtraceCounter;
 
         $caption = trim($caption);
-        if (empty($caption)) {
+        if ('' == $caption) {
             $caption = sprintf('Backtrace #%s', ++$this->_backtraceCounter);
         }
 
@@ -483,7 +483,7 @@ final class phpDeeBuk implements \ArrayAccess {
         }
 
         $caption = trim($caption);
-        if (empty($caption)) {
+        if ('' == $caption) {
             $caption = 'Test #' . trim(++$this->_assertCounter);
         }
 
@@ -524,7 +524,7 @@ final class phpDeeBuk implements \ArrayAccess {
      */
     public function dump($val, $caption = null) {
         $caption = trim($caption);
-        if (empty($caption)) {
+        if ('' == $caption) {
             $caption = sprintf('Dump #%s', ++$this->_dumpCounter);
         }
 
@@ -1088,7 +1088,7 @@ pre.debuggerConsole {
 
     private static function getCssColor($cssColor) {
         $result = trim($cssColor);
-        if (empty($result)) {
+        if ('' == $result) {
             $result = null;
         }
 
